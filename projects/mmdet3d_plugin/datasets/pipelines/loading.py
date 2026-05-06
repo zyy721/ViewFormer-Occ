@@ -203,7 +203,10 @@ class LoadOccGTFromFile(object):
             mask_lidar = mask_camera
         else:
             occ_gt_path = results['occ_gt_path']
-            occ_gt_path = os.path.join(self.data_root,occ_gt_path)
+            if "data/nuscenes" not in occ_gt_path:
+                occ_gt_path = os.path.join(self.data_root,occ_gt_path)
+            else:
+                occ_gt_path = os.path.join(occ_gt_path, 'labels.npz')
 
             occ_labels = np.load(occ_gt_path)
             semantics = occ_labels['semantics']

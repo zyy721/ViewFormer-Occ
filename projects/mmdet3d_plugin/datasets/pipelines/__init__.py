@@ -14,6 +14,11 @@ from .transform_3d import CustomGlobalRotScaleTransImage
 
 from .loading import GetVelGTFromBox
 
+from .loading_3d import (LoadMultiViewMultiSweepImageFromFiles,
+                         PreparePseudoDepth,
+                        #  PrepapreImageForVGGT
+                         )
+
 __all__ = [
     'PadMultiViewImage', 'NormalizeMultiviewImage', 
     'PhotoMetricDistortionMultiViewImage', 'CropMultiViewImage',
@@ -21,5 +26,8 @@ __all__ = [
     'ResizeMultiViewImage', 'ResizeCropFlipImage', 'GlobalRotScaleTransImage',
     'LoadMultiViewImageFromMultiSweepsFiles',
     'LoadOccGTFromFile', 'CustomResizeCropFlipImage', 'CustomGlobalRotScaleTransImage',
-    'GetVelGTFromBox'
+    'GetVelGTFromBox',
+
+    'LoadMultiViewMultiSweepImageFromFiles', 'PreparePseudoDepth'
+
 ]
