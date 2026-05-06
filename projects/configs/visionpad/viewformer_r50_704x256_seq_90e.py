@@ -315,7 +315,9 @@ ida_aug_conf = {
 # ]
 
 train_pipeline = [
-    dict(type='LoadMultiViewImageFromFiles', to_float32=True),
+    # dict(type='LoadMultiViewImageFromFiles', to_float32=True),
+    dict(type='CustomLoadMultiViewImageFromFiles', to_float32=True),
+
     dict(type='LoadOccGTFromFile',data_root=data_root, pc_range=point_cloud_range),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True, with_attr_label=False),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
@@ -359,7 +361,9 @@ train_pipeline = [
 ]
 
 test_pipeline = [
-    dict(type='LoadMultiViewImageFromFiles', to_float32=True),
+    # dict(type='LoadMultiViewImageFromFiles', to_float32=True),
+    dict(type='CustomLoadMultiViewImageFromFiles', to_float32=True),    
+    
     dict(type='LoadOccGTFromFile',data_root=data_root),
     dict(type='CustomResizeCropFlipImage', data_aug_conf=ida_aug_conf, training=False),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),

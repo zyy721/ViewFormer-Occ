@@ -201,7 +201,7 @@ class NuScenesSweepDatasetFuture(NuScenesSweepDataset):
         self.use_sc_depth = use_sc_depth
 
     def load_data_info(self, index):
-        index = 0
+        # index = 0
 
         info = self.data_infos[index]
         
