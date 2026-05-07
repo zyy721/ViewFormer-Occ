@@ -60,7 +60,9 @@ embed_dims = 72
 num_heads = 9
 
 num_frame_losses = 1
-use_temporal = True
+# use_temporal = True
+use_temporal = False
+
 queue_length = 0
 
 video_test_mode = True
@@ -199,17 +201,17 @@ model = dict(
                     transformerlayers=dict(
                         type='ViewFormerTransformerLayer',
                         attn_cfgs=[
-                            dict(
-                                type='StreamTemporalAttn',
-                                pc_range=point_cloud_range,
-                                num_levels=num_memory,
-                                embed_dims=bev_dim,
-                                num_heads=num_heads,
-                                data_from_dict=True,
-                                voxel2bev=voxel2bev,
-                                voxel_dim=embed_dims,
-                                num_points=4,
-                            ),
+                            # dict(
+                            #     type='StreamTemporalAttn',
+                            #     pc_range=point_cloud_range,
+                            #     num_levels=num_memory,
+                            #     embed_dims=bev_dim,
+                            #     num_heads=num_heads,
+                            #     data_from_dict=True,
+                            #     voxel2bev=voxel2bev,
+                            #     voxel_dim=embed_dims,
+                            #     num_points=4,
+                            # ),
                             dict(
                                 type='ViewAttn',
                                 pc_range=point_cloud_range,
@@ -220,7 +222,9 @@ model = dict(
                                 num_points=1,
                             )
                         ],
-                        operation_order=('cross_attn', 'cross_attn')
+                        # operation_order=('cross_attn', 'cross_attn')
+                        operation_order=('cross_attn')
+
                         ))),
             # loss_prob=dict(
             #     type='FocalLoss',
