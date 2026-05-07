@@ -2,7 +2,7 @@ _base_ = [
     '../../../mmdetection3d/configs/_base_/datasets/nus-3d.py',
     '../../../mmdetection3d/configs/_base_/default_runtime.py'
 ]
-backbone_norm_cfg = dict(type='LN', requires_grad=True)
+
 plugin=True
 plugin_dir='projects/mmdet3d_plugin/'
 
@@ -40,10 +40,15 @@ point_class_names = [
     'vegetation'
 ]
 
-num_gpus = 8
+# num_gpus = 8
+# batch_size = 1
+# num_iters_per_epoch = 28130 // (num_gpus * batch_size)
+# num_epochs = 24
+
+num_gpus = 4
 batch_size = 1
-num_iters_per_epoch = 28130 // (num_gpus * batch_size)
-num_epochs = 90
+num_iters_per_epoch = 14065 // (num_gpus * batch_size)
+num_epochs = 12
 
 
 bev_h_ = 100
@@ -79,6 +84,8 @@ input_modality = dict(
     use_map=False,
     use_external=False)
 
+checkpoint_file = 'ckpts/mask_rcnn_internimage_t_fpn_3x_coco.pth'
+
 model = dict(
     # type='ViewFormer',
     type='ViewFormerSSL3DGS',
@@ -91,24 +98,30 @@ model = dict(
     num_frame_losses=num_frame_losses,
     depth_supvise=False,
     img_backbone=dict(
-        #pretrained='torchvision://resnet50',
-        type='ResNet',
-        depth=50,
-        num_stages=4,
-        out_indices=(1, 2, 3),
-        frozen_stages=-1,
-        norm_cfg=dict(type='BN2d', requires_grad=False),
-        norm_eval=True,
+        _delete_=True,
+        type='InternImage',
+        core_op='DCNv3',
+        channels=64,
+        depths=[4, 4, 18, 4],
+        groups=[4, 8, 16, 32],
+        mlp_ratio=4.,
+        drop_path_rate=0.2,
+        norm_layer='LN',
+        layer_scale=1.0,
+        offset_scale=1.0,
+        post_norm=False,
         with_cp=True,
-        style='pytorch'),
+        out_indices=(1, 2, 3),
+        init_cfg=dict(
+            type='Pretrained', checkpoint=checkpoint_file,
+            prefix='backbone.')),
     img_neck=dict(
         type='FPN',
-        in_channels=[512, 1024, 2048],
+        in_channels=[128, 256, 512],
         out_channels=256,
         num_outs=num_levels,
         add_extra_convs='on_output',
         relu_before_extra_convs=True),
-
     pts_bbox_head=dict(
         type="PretrainHead",
         # fp16_enabled=fp16_enabled,
@@ -167,8 +180,7 @@ model = dict(
         # pts_bbox_head=dict(
         view_former_head=dict(
             # type='ViewFormerHead',
-            type='CustomViewFormerHead',
-
+            type='CustomViewFormerHead',        
             pc_range=point_cloud_range,
             num_levels=num_levels,
             final_dim=final_dim,
@@ -176,6 +188,7 @@ model = dict(
             bev_h=bev_h_,
             bev_w=bev_w_,
             num_points_in_pillar=num_points_in_pillar,
+            sync_cls_avg_factor=True,
             time_range=time_range,
             use_mask_lidar=False,
             use_mask_camera=True,
@@ -256,6 +269,7 @@ model = dict(
 
 # dataset_type = 'NuSceneOcc'
 dataset_type = "NuScenesSweepDatasetFuture"
+
 data_root = 'data/nuscenes/'
 file_client_args = dict(backend='disk')
 
@@ -270,35 +284,18 @@ ida_aug_conf = {
         # "rand_flip": True,
 
         "rand_flip": False,
-
     }
 
 # train_pipeline = [
-#     # dict(type='LoadMultiViewImageFromFiles', to_float32=True),
-#     # dict(type='LoadOccGTFromFile',data_root=data_root, pc_range=point_cloud_range),
-    
-#     dict(
-#         type="LoadMultiViewMultiSweepImageFromFiles",
-#         sweep_num=cam_sweep_num,
-#         to_float32=True,
-#         file_client_args=file_client_args,
-#     ),
-#     dict(
-#         type='PrepapreImageInputs',
-#         input_size=depth_ssl_size,
-#         to_float32=True,
-#         load_future_img=True,
-#     ),
-
-#     # dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True, with_attr_label=False),
-#     # dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
-#     # dict(type='ObjectNameFilter', classes=class_names),
-
-#     # dict(type='CustomResizeCropFlipImage', data_aug_conf=ida_aug_conf, training=True),
-#     # dict(type='CustomGlobalRotScaleTransImage',
-#     #         flip_hv_ratio=[0.5, 0.5],
-#     #         pc_range=point_cloud_range,
-#     #         ),
+#     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
+#     dict(type='LoadOccGTFromFile',data_root=data_root, pc_range=point_cloud_range),
+#     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True, with_attr_label=False),
+#     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
+#     dict(type='ObjectNameFilter', classes=class_names),
+#     dict(type='CustomResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=True),
+#     dict(type='CustomGlobalRotScaleTransImage',
+#             flip_hv_ratio=[0.5, 0.5],
+#             pc_range=point_cloud_range,),
 #     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
 #     dict(type='PadMultiViewImage', size_divisor=32),
 #     dict(type='DefaultFormatBundle3D', class_names=class_names),
@@ -311,9 +308,10 @@ ida_aug_conf = {
 #                     'img_norm_cfg', 'pcd_trans', 'sample_idx',
 #                     'pcd_scale_factor', 'pcd_rotation', 'pts_filename',
 #                     'transformation_3d_flow', 
-#                     'scene_token', 'can_bus', 'ego2lidar', 'prev_idx', 'next_idx',
-#                     'ego2global', 'timestamp', 'img_trans_dict', 'ego_trans_dict',
+#                     'scene_token', 'can_bus', 'ego2lidar', 'prev_idx', 'next_idx', # this line from bevformer_occ
+#                     'ego2global', 'timestamp', 'img_trans_dict', 'ego_trans_dict', # ours
 #                     'cam_intrinsic', 'cam2ego', 'pixel_wise_label', # for depth aux
+#                     'voxel_semantics','mask_lidar','mask_camera', # for debug
 #                     )
 #         )
 # ]
@@ -326,13 +324,10 @@ train_pipeline = [
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True, with_attr_label=False),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectNameFilter', classes=class_names),
-
-    dict(type='CustomResizeCropFlipImage', data_aug_conf=ida_aug_conf, training=True),
+    dict(type='CustomResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=True),
     dict(type='CustomGlobalRotScaleTransImage',
             flip_hv_ratio=[0.5, 0.5],
-            pc_range=point_cloud_range,
-            ),
-
+            pc_range=point_cloud_range,),
     dict(
         type='PrepapreImageInputs',
         input_size=depth_ssl_size,
@@ -354,22 +349,24 @@ train_pipeline = [
                     'img_norm_cfg', 'pcd_trans', 'sample_idx',
                     'pcd_scale_factor', 'pcd_rotation', 'pts_filename',
                     'transformation_3d_flow', 
-                    'scene_token', 'can_bus', 'ego2lidar', 'prev_idx', 'next_idx',
-                    'ego2global', 'timestamp', 'img_trans_dict', 'ego_trans_dict',
+                    'scene_token', 'can_bus', 'ego2lidar', 'prev_idx', 'next_idx', # this line from bevformer_occ
+                    'ego2global', 'timestamp', 'img_trans_dict', 'ego_trans_dict', # ours
                     'cam_intrinsic', 'cam2ego', 'pixel_wise_label', # for depth aux
+                    
+                    'voxel_semantics','mask_lidar','mask_camera', # for debug
 
                     'lidar2cam', 'cam_intrinsic_ori', 
 
                     )
         )
 ]
-
 test_pipeline = [
     # dict(type='LoadMultiViewImageFromFiles', to_float32=True),
     dict(type='CustomLoadMultiViewImageFromFiles', to_float32=True),    
-    
+
+
     dict(type='LoadOccGTFromFile',data_root=data_root),
-    dict(type='CustomResizeCropFlipImage', data_aug_conf=ida_aug_conf, training=False),
+    dict(type='CustomResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=False),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(
@@ -392,8 +389,9 @@ test_pipeline = [
                     'img_norm_cfg', 'pcd_trans', 'sample_idx',
                     'pcd_scale_factor', 'pcd_rotation', 'pts_filename',
                     'transformation_3d_flow', 
-                    'scene_token', 'can_bus', 'ego2lidar', 'prev_idx', 'next_idx',
-                    'ego2global', 'timestamp', 'img_trans_dict', 'ego_trans_dict',
+                    'scene_token', 'can_bus', 'ego2lidar', 'prev_idx', 'next_idx', # this line from bevformer_occ
+                    'ego2global', 'timestamp', 'img_trans_dict', 'ego_trans_dict', # ours
+                    'mask_lidar','mask_camera', # for debug show
 
                     'lidar2cam'
 
@@ -432,7 +430,7 @@ data = dict(
         box_type_3d='LiDAR',
 
         load_interval=2,
-        
+
     ),
     val=dict(
         type=dataset_type,
@@ -447,16 +445,13 @@ data = dict(
         queue_length=queue_length,
         video_test_mode=video_test_mode,
         box_type_3d='LiDAR',
-        
         load_interval=1,    
-
     ),
     test=dict(
         type=dataset_type,
         data_root=data_root,
         # ann_file=data_root + 'occ_infos_temporal_val.pkl',
         ann_file=data_root + "nuscenes_unified_infos_val_v4.pkl",
-
         pipeline=test_pipeline,
         classes=class_names,
         modality=input_modality,
@@ -474,71 +469,74 @@ data = dict(
 
 
 # data = dict(
-#     samples_per_gpu=1,
+#     samples_per_gpu=batch_size,
 #     workers_per_gpu=4,
 #     train=dict(
 #         type=dataset_type,
-#         use_depth_consistency=True,
-#         use_flow_photometric_loss=use_flow_photometric_loss,
-#         future_frames=[1],
 #         data_root=data_root,
-#         ann_file=data_root
-#         + "nuscenes_unified_infos_train_v4.pkl",  # please change to your own info file
+#         ann_file=data_root + 'occ_infos_temporal_train.pkl',
 #         pipeline=train_pipeline,
 #         classes=class_names,
 #         modality=input_modality,
 #         test_mode=False,
 #         use_valid_flag=True,
-#         filter_empty_gt=False,
-#         box_type_3d="LiDAR",
-#         load_interval=1,
-#     ),
+#         queue_length=queue_length,
+#         num_frame_losses=num_frame_losses,
+#         seq_split_num=2, # streaming video training
+#         seq_mode=True, # streaming video training
+#         box_type_3d='LiDAR'),
 #     val=dict(
 #         type=dataset_type,
+#         data_root=data_root,
+#         ann_file=data_root + 'occ_infos_temporal_val.pkl',
 #         pipeline=test_pipeline,
 #         classes=class_names,
 #         modality=input_modality,
-#         ann_file=data_root + "nuscenes_unified_infos_val_v4.pkl",
-#         load_interval=1,
-#     ),  # please change to your own info file
+#         test_mode=True,
+#         queue_length=queue_length,
+#         video_test_mode=video_test_mode,
+#         box_type_3d='LiDAR'),
 #     test=dict(
 #         type=dataset_type,
+#         data_root=data_root,
+#         ann_file=data_root + 'occ_infos_temporal_val.pkl',
+#         #ann_file=data_root + 'occ_infos_temporal_test.pkl',
 #         pipeline=test_pipeline,
 #         classes=class_names,
 #         modality=input_modality,
-#         ann_file=data_root + "nuscenes_unified_infos_train_v4.pkl",
-#         load_interval=1,
-#     ),
+#         test_mode=True,
+#         queue_length=queue_length,
+#         video_test_mode=video_test_mode,
+#         box_type_3d='LiDAR'),
 #     shuffler_sampler=dict(type='InfiniteGroupEachSampleInBatchSampler'),
 #     nonshuffler_sampler=dict(type='DistributedSampler')
-# )  # please change to your own info file
+#     )
+
 
 
 
 optimizer = dict(
-    type='AdamW', 
-    lr=2e-4, # bs 8: 2e-4 || bs 16: 4e-4
-    paramwise_cfg=dict(
-        custom_keys={
-            'img_backbone': dict(lr_mult=0.25),
-        }),
-    weight_decay=0.01)
+    type='AdamW', lr=0.0002, weight_decay=0.01,
+    constructor='CustomLayerDecayOptimizerConstructor',
+    paramwise_cfg=dict(num_layers=30, layer_decay_rate=0.96,
+                       depths=[4, 4, 18, 4]))
 
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+#optimizer_config = dict(type='Fp16OptimizerHook', loss_scale=dict(init_scale=512), grad_clip=dict(max_norm=35, norm_type=2))
 
 lr_config = dict(
-    policy='CosineAnnealing',
+    policy='step',
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 10,
-    min_lr_ratio=1e-3,
-    )
+    # step=[19*num_iters_per_epoch, 23*num_iters_per_epoch])
+    step=[9*num_iters_per_epoch, 11*num_iters_per_epoch])
 
-
-evaluation = dict(interval=num_iters_per_epoch*num_epochs, pipeline=test_pipeline)
+# evaluation = dict(interval=num_iters_per_epoch*num_epochs, pipeline=test_pipeline)
+evaluation = dict(interval=num_iters_per_epoch*(num_epochs+1), pipeline=test_pipeline)
+find_unused_parameters=False #### when use checkpoint, find_unused_parameters must be False
 checkpoint_config = dict(interval=num_iters_per_epoch, max_keep_ckpts=1)
 runner = dict(
     type='IterBasedRunner', max_iters=num_epochs * num_iters_per_epoch)
-load_from = 'ckpts/r50_256x705_depth_pretrain.pth'  # the same pretrain-weights as in fb-occ
 
 
